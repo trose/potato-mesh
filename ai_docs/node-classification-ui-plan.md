@@ -26,113 +26,64 @@ The ingestor script (`data/mesh.py`) currently collects:
 
 ## Implementation Plan
 
-### Phase 1: Data Layer Enhancements
+### Phase 1: Frontend-Only Implementation
 
-#### 1.1 Ingestor Script Updates
-**File**: `data/mesh.py`
+**No backend changes needed!** The frontend can classify nodes in real-time using existing data.
 
-**Changes needed**:
-- ✅ **No additional data collection required** - all necessary fields are already collected
-- The ingestor already captures:
-  - `hardware` field (T_DECK, T_ECHO, etc.)
-  - `role` field (ROUTER, CLIENT, etc.)
-  - `user` and `aka` fields for keyword analysis
-  - All other required data for classification
+#### 1.1 Frontend Classification Logic
+**File**: `web/views/index.erb` (JavaScript section)
 
-**Classification Logic**:
-```python
-def classify_node(node_data):
-    """Classify node based on hardware, role, and keywords."""
-    # Priority 1: Hardware-based classification
-    if node_data.get('hardware') == 'T_DECK':
-        return 'tdeck'
-    elif node_data.get('hardware') == 'T_ECHO':
-        return 'techo'
-    
-    # Priority 2: Role-based classification
-    if node_data.get('role') in ['ROUTER', 'ROUTER_LATE']:
-        return 'bbs_server'
-    
-    # Priority 3: Keyword-based classification
-    name_text = f"{node_data.get('user', '')} {node_data.get('aka', '')}".lower()
-    
-    if any(kw in name_text for kw in ['solar', 'sun', '☀']):
-        return 'solar'
-    elif any(kw in name_text for kw in ['mobile', 'car', 'vehicle']):
-        return 'mobile'
-    elif any(kw in name_text for kw in ['base', 'home', 'qth', 'fixed']):
-        return 'base_station'
-    elif any(kw in name_text for kw in ['weather', 'temp', 'sensor']):
-        return 'weather'
-    elif any(kw in name_text for kw in ['bbs', 'station', 'repeater', 'rptr']):
-        return 'bbs_server'
-    
-    return 'other'
-```
-
-#### 1.2 Database Schema Updates
-**File**: `data/messages.sql` (if needed)
-
-**Optional enhancement** (only if we want to cache classifications):
-```sql
--- Add classification field to nodes table (optional caching)
-ALTER TABLE nodes ADD COLUMN category VARCHAR(20);
-```
-
-**Note**: Classification can be computed on-the-fly from existing data, so database changes are optional.
-
-### Phase 2: Backend API Updates
-
-#### 2.1 Node Classification Service
-**File**: `web/app.rb`
-
-**New endpoint**: `/nodes/classified`
-- Returns nodes with classification data computed on-the-fly
-- Applies classification algorithm to existing node data
-- Maintains backward compatibility with existing `/nodes` endpoint
-- No database storage required - classification is computed in real-time
-
-**Implementation**:
-```ruby
-get '/nodes/classified' do
-  nodes = get_nodes_from_db
-  classified_nodes = nodes.map do |node|
-    category = classify_node(node)
-    node.merge(
-      'category' => category,
-      'icon' => get_node_icon(category),
-      'display_name' => get_display_name(node)
-    )
-  end
-  classified_nodes.to_json
-end
-```
-
-#### 2.2 Classification Helper Functions
-```ruby
-def classify_node(node_data)
-  # Ruby implementation of classification logic
-  # (mirrors Python version above)
-end
-
-def get_node_icon(category)
-  icon_map = {
-    'bbs_server' => '📡',
-    'weather' => '🌡️',
-    'mobile' => '🚗',
-    'base_station' => '🏠',
-    'solar' => '☀️',
-    'tdeck' => '⌨️',
-    'techo' => '📱',
-    'other' => '📡'
+**Classification function**:
+```javascript
+function classifyNode(node) {
+  // Priority 1: Hardware-based classification
+  if (node.hw_model === 'T_DECK') {
+    return 'tdeck';
+  } else if (node.hw_model === 'T_ECHO') {
+    return 'techo';
   }
-  icon_map[category] || '📡'
-end
+  
+  // Priority 2: Role-based classification
+  if (node.role === 'ROUTER' || node.role === 'ROUTER_LATE') {
+    return 'bbs_server';
+  }
+  
+  // Priority 3: Keyword-based classification
+  const nameText = `${node.user || ''} ${node.aka || ''}`.toLowerCase();
+  
+  if (['solar', 'sun', '☀'].some(kw => nameText.includes(kw))) {
+    return 'solar';
+  } else if (['mobile', 'car', 'vehicle'].some(kw => nameText.includes(kw))) {
+    return 'mobile';
+  } else if (['base', 'home', 'qth', 'fixed'].some(kw => nameText.includes(kw))) {
+    return 'base_station';
+  } else if (['weather', 'temp', 'sensor'].some(kw => nameText.includes(kw))) {
+    return 'weather';
+  } else if (['bbs', 'station', 'repeater', 'rptr'].some(kw => nameText.includes(kw))) {
+    return 'bbs_server';
+  }
+  
+  return 'other';
+}
+
+function getNodeIcon(category) {
+  const iconMap = {
+    'bbs_server': '📡',
+    'weather': '🌡️',
+    'mobile': '🚗',
+    'base_station': '🏠',
+    'solar': '☀️',
+    'tdeck': '⌨️',
+    'techo': '📱',
+    'other': '📡'
+  };
+  return iconMap[category] || '📡';
+}
 ```
 
-### Phase 3: Frontend UI Updates
+### Phase 2: Frontend UI Updates
 
-#### 3.1 Map View Toggle
+#### 2.1 Map View Toggle
 **File**: `web/views/index.erb`
 
 **New UI elements**:
@@ -151,7 +102,7 @@ end
 </div>
 ```
 
-#### 3.2 Icon-based Markers
+#### 2.2 Icon-based Markers
 **Replace circle markers with icon markers**:
 
 ```javascript
@@ -180,7 +131,7 @@ const nodeIcons = {
 };
 ```
 
-#### 3.3 Enhanced Tooltips
+#### 2.3 Enhanced Tooltips
 **Adjective categories in tooltips**:
 
 ```javascript
@@ -206,7 +157,7 @@ function createNodeTooltip(node) {
 }
 ```
 
-#### 3.4 Updated Legend
+#### 2.4 Updated Legend
 **Dynamic legend based on view mode**:
 
 ```javascript
@@ -227,9 +178,9 @@ function updateLegend(viewMode) {
 }
 ```
 
-### Phase 4: Styling and UX
+### Phase 3: Styling and UX
 
-#### 4.1 CSS Updates
+#### 3.1 CSS Updates
 **File**: `web/views/index.erb` (style section)
 
 ```css
@@ -286,14 +237,14 @@ body.dark .map-controls {
 }
 ```
 
-#### 4.2 Responsive Design
+#### 3.2 Responsive Design
 - Ensure icons are visible on mobile devices
 - Maintain touch-friendly marker sizes
 - Preserve existing mobile layout
 
-### Phase 5: Testing and Validation
+### Phase 4: Testing and Validation
 
-#### 5.1 Test Cases
+#### 4.1 Test Cases
 - [ ] Toggle between original and classified views
 - [ ] Icon rendering on different screen sizes
 - [ ] Tooltip accuracy for adjective categories
@@ -301,7 +252,7 @@ body.dark .map-controls {
 - [ ] Dark mode compatibility
 - [ ] Performance with large node counts
 
-#### 5.2 Data Validation
+#### 4.2 Data Validation
 - [ ] Classification accuracy against known nodes
 - [ ] Edge cases (nodes with multiple characteristics)
 - [ ] Fallback behavior for unclassified nodes
