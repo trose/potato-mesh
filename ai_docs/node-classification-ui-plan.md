@@ -73,13 +73,13 @@ def classify_node(node_data):
 #### 1.2 Database Schema Updates
 **File**: `data/messages.sql` (if needed)
 
-**Optional enhancement**:
+**Optional enhancement** (only if we want to cache classifications):
 ```sql
--- Add classification fields to nodes table
+-- Add classification field to nodes table (optional caching)
 ALTER TABLE nodes ADD COLUMN category VARCHAR(20);
-ALTER TABLE nodes ADD COLUMN classification_confidence DECIMAL(3,2);
-ALTER TABLE nodes ADD COLUMN classification_method VARCHAR(20);
 ```
+
+**Note**: Classification can be computed on-the-fly from existing data, so database changes are optional.
 
 ### Phase 2: Backend API Updates
 
@@ -87,18 +87,20 @@ ALTER TABLE nodes ADD COLUMN classification_method VARCHAR(20);
 **File**: `web/app.rb`
 
 **New endpoint**: `/nodes/classified`
-- Returns nodes with classification data
+- Returns nodes with classification data computed on-the-fly
 - Applies classification algorithm to existing node data
 - Maintains backward compatibility with existing `/nodes` endpoint
+- No database storage required - classification is computed in real-time
 
 **Implementation**:
 ```ruby
 get '/nodes/classified' do
   nodes = get_nodes_from_db
   classified_nodes = nodes.map do |node|
+    category = classify_node(node)
     node.merge(
-      'category' => classify_node(node),
-      'icon' => get_node_icon(classify_node(node)),
+      'category' => category,
+      'icon' => get_node_icon(category),
       'display_name' => get_display_name(node)
     )
   end
