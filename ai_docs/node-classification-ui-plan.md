@@ -79,6 +79,58 @@ function getNodeIcon(category) {
   };
   return iconMap[category] || '📡';
 }
+
+function getHardwareIcon(hwModel) {
+  const hardwareIconMap = {
+    // T-Deck devices
+    'T_DECK': '⌨️',
+    
+    // T-Echo devices  
+    'T_ECHO': '📱',
+    
+    // Heltec devices
+    'HELTEC_V3': '📻',
+    'HELTEC_V4': '📻',
+    'HELTEC_V5': '📻',
+    
+    // RAK devices
+    'RAK4631': '📡',
+    'RAK11200': '📡',
+    'RAK11300': '📡',
+    'RAK4631_5005': '📡',
+    
+    // Station devices
+    'STATION_G1': '🏗️',
+    'STATION_G2': '🏗️',
+    
+    // Tracker devices
+    'TRACKER_T1000_E': '🌡️',
+    'TRACKER_T1000': '📍',
+    
+    // Generic categories for unknown models
+    'HELTEC': '📻',
+    'RAK': '📡',
+    'STATION': '🏗️',
+    'TRACKER': '📍'
+  };
+  
+  // Try exact match first
+  if (hardwareIconMap[hwModel]) {
+    return hardwareIconMap[hwModel];
+  }
+  
+  // Try partial matches for unknown variants
+  const hwUpper = hwModel.toUpperCase();
+  if (hwUpper.includes('HELTEC')) return '📻';
+  if (hwUpper.includes('RAK')) return '📡';
+  if (hwUpper.includes('STATION')) return '🏗️';
+  if (hwUpper.includes('TRACKER')) return '📍';
+  if (hwUpper.includes('T_DECK')) return '⌨️';
+  if (hwUpper.includes('T_ECHO')) return '📱';
+  
+  // Default fallback
+  return '📡';
+}
 ```
 
 ### Phase 2: Frontend UI Updates
@@ -88,7 +140,7 @@ function getNodeIcon(category) {
 
 **New UI elements**:
 - Toggle button/selector for map view modes
-- "Original" vs "Classified" view options
+- Three view options: Original, Classified, and Hardware
 - Preserve existing functionality
 
 **Implementation**:
@@ -98,18 +150,45 @@ function getNodeIcon(category) {
   <select id="mapViewMode">
     <option value="original">Original (Role-based)</option>
     <option value="classified">Classified (Node Types)</option>
+    <option value="hardware">Hardware (Device Models)</option>
   </select>
 </div>
 ```
 
 #### 2.2 Icon-based Markers
-**Replace circle markers with icon markers**:
+**Replace circle markers with icon markers based on view mode**:
 
 ```javascript
 // Icon marker creation
-function createIconMarker(node, category) {
+function createIconMarker(node, viewMode) {
+  let iconHtml, iconClass;
+  
+  switch(viewMode) {
+    case 'original':
+      // Use existing circle markers with role colors
+      return L.circleMarker([node.latitude, node.longitude], {
+        radius: 9,
+        color: '#000',
+        weight: 1,
+        fillColor: roleColors[node.role] || '#3388ff',
+        fillOpacity: 0.7,
+        opacity: 0.7
+      });
+      
+    case 'classified':
+      const category = classifyNode(node);
+      iconHtml = getNodeIcon(category);
+      iconClass = `node-icon classified ${category}`;
+      break;
+      
+    case 'hardware':
+      iconHtml = getHardwareIcon(node.hw_model);
+      iconClass = `node-icon hardware ${node.hw_model}`;
+      break;
+  }
+  
   const icon = L.divIcon({
-    html: `<div class="node-icon ${category}">${getNodeIcon(category)}</div>`,
+    html: `<div class="${iconClass}">${iconHtml}</div>`,
     className: 'custom-div-icon',
     iconSize: [24, 24],
     iconAnchor: [12, 12]
@@ -117,18 +196,6 @@ function createIconMarker(node, category) {
   
   return L.marker([node.latitude, node.longitude], { icon });
 }
-
-// Icon mapping
-const nodeIcons = {
-  'bbs_server': '📡',      // Antenna/Tower
-  'weather': '🌡️',         // Thermometer
-  'mobile': '🚗',          // Car
-  'base_station': '🏠',    // House
-  'solar': '☀️',           // Sun
-  'tdeck': '⌨️',           // Keyboard
-  'techo': '📱',           // Phone
-  'other': '📡'            // Generic radio
-};
 ```
 
 #### 2.3 Enhanced Tooltips
@@ -164,16 +231,51 @@ function createNodeTooltip(node) {
 function updateLegend(viewMode) {
   const legendDiv = document.querySelector('.legend');
   
-  if (viewMode === 'original') {
-    // Show role-based colors
-    legendDiv.innerHTML = Object.entries(roleColors)
-      .map(([role, color]) => `<div><span style="background:${color}"></span>${role}</div>`)
-      .join('');
-  } else {
-    // Show category-based icons
-    legendDiv.innerHTML = Object.entries(categoryDisplayNames)
-      .map(([category, name]) => `<div><span class="legend-icon">${nodeIcons[category]}</span>${name}</div>`)
-      .join('');
+  switch(viewMode) {
+    case 'original':
+      // Show role-based colors
+      legendDiv.innerHTML = Object.entries(roleColors)
+        .map(([role, color]) => `<div><span style="background:${color}"></span>${role}</div>`)
+        .join('');
+      break;
+        
+    case 'classified':
+      // Show category-based icons
+      const categoryDisplayNames = {
+        'bbs_server': 'BBS Server',
+        'weather': 'Weather Station',
+        'mobile': 'Mobile Node',
+        'base_station': 'Base Station',
+        'solar': 'Solar Node',
+        'tdeck': 'T-Deck',
+        'techo': 'T-Echo',
+        'other': 'Other'
+      };
+      legendDiv.innerHTML = Object.entries(categoryDisplayNames)
+        .map(([category, name]) => `<div><span class="legend-icon">${getNodeIcon(category)}</span>${name}</div>`)
+        .join('');
+      break;
+        
+    case 'hardware':
+      // Show hardware-based icons
+      const hardwareDisplayNames = {
+        'T_DECK': 'T-Deck',
+        'T_ECHO': 'T-Echo',
+        'HELTEC_V3': 'Heltec V3',
+        'HELTEC_V4': 'Heltec V4',
+        'HELTEC_V5': 'Heltec V5',
+        'RAK4631': 'RAK4631',
+        'RAK11200': 'RAK11200',
+        'RAK11300': 'RAK11300',
+        'STATION_G1': 'Station G1',
+        'STATION_G2': 'Station G2',
+        'TRACKER_T1000': 'Tracker T1000',
+        'TRACKER_T1000_E': 'Tracker T1000-E'
+      };
+      legendDiv.innerHTML = Object.entries(hardwareDisplayNames)
+        .map(([hw, name]) => `<div><span class="legend-icon">${getHardwareIcon(hw)}</span>${name}</div>`)
+        .join('');
+      break;
   }
 }
 ```
@@ -257,8 +359,14 @@ body.dark .map-controls {
 - [ ] Edge cases (nodes with multiple characteristics)
 - [ ] Fallback behavior for unclassified nodes
 
-## Node Categories and Icons
+## Map View Modes
 
+### 1. Original View (Role-based)
+- **Colored circle markers** based on node role
+- **Existing functionality** preserved
+- **Role colors**: CLIENT, ROUTER, etc.
+
+### 2. Classified View (Node Types)
 Based on the Denver Mesh analysis:
 
 | Category | Icon | Description | Examples |
@@ -271,6 +379,25 @@ Based on the Denver Mesh analysis:
 | `tdeck` | ⌨️ | T-Deck devices | Hardware: T_DECK |
 | `techo` | 📱 | T-Echo devices | Hardware: T_ECHO |
 | `other` | 📡 | Unclassified nodes | Default category |
+
+### 3. Hardware View (Device Models)
+Device-specific icons for different hardware models:
+
+| Hardware Model | Icon | Description |
+|----------------|------|-------------|
+| `T_DECK` | ⌨️ | T-Deck keyboard device |
+| `T_ECHO` | 📱 | T-Echo handheld device |
+| `HELTEC_V3` | 📻 | Heltec V3 LoRa module |
+| `HELTEC_V4` | 📻 | Heltec V4 LoRa module |
+| `HELTEC_V5` | 📻 | Heltec V5 LoRa module |
+| `RAK4631` | 📡 | RAK4631 LoRa module |
+| `RAK11200` | 📡 | RAK11200 LoRa module |
+| `RAK11300` | 📡 | RAK11300 LoRa module |
+| `STATION_G1` | 🏗️ | Station G1 base station |
+| `STATION_G2` | 🏗️ | Station G2 base station |
+| `TRACKER_T1000` | 📍 | Tracker T1000 GPS device |
+| `TRACKER_T1000_E` | 🌡️ | Tracker T1000-E environmental |
+| Unknown/Other | 📡 | Generic radio icon |
 
 ## Adjective Categories (Tooltip Features)
 
