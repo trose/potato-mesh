@@ -331,28 +331,26 @@ These are additional characteristics that can be combined with primary categorie
 - **🔋 Battery**: Nodes with low battery status
 - **📶 Strong Signal**: Nodes with high signal strength
 
-## Implementation Timeline
+## Implementation Approach
 
-### Week 1: Backend Foundation
-- [ ] Implement classification algorithm in Ruby
-- [ ] Add `/nodes/classified` API endpoint
-- [ ] Test classification accuracy
+The classification will be based on a combination of:
 
-### Week 2: Frontend Core
-- [ ] Add map view toggle UI
-- [ ] Implement icon-based markers
-- [ ] Update legend system
+1. **Hardware Type** (most deterministic) - T_DECK, T_ECHO, etc.
+2. **Role Field** (deterministic) - ROUTER, CLIENT, etc.
+3. **Keyword Analysis** (heuristic) - parsing user names and AKA fields
 
-### Week 3: Polish and Testing
-- [ ] Enhanced tooltips with adjectives
-- [ ] CSS styling and dark mode
-- [ ] Mobile responsiveness testing
-- [ ] Performance optimization
+The keyword approach is what I was planning, but we should first examine the actual node list output to see what deterministic metadata is available beyond just hardware and role fields.
 
-### Week 4: Validation and Documentation
-- [ ] User testing and feedback
-- [ ] Documentation updates
-- [ ] Final bug fixes
+### Data Structure Analysis Needed
+
+Before implementing, we should examine the actual node data structure from the Meshtastic CLI to identify:
+
+- **Available fields** in the node objects
+- **Deterministic indicators** beyond hardware/role
+- **Telemetry data** that might indicate node type
+- **Configuration fields** that could provide classification hints
+
+This analysis will help determine if we can rely more on deterministic data rather than keyword parsing.
 
 ## Success Metrics
 
